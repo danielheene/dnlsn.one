@@ -1,0 +1,47 @@
+name: Website Deployment
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v1
+
+      - name: Install dependencies
+        if: success()
+        uses: borales/actions-yarn@v2.3.0
+        with:
+          cmd: install
+
+# TODO: enable tasks
+#      - name: ESLint
+#        if: success()
+#        uses: borales/actions-yarn@v2.3.0
+#        with:
+#          cmd: lint:eslint
+#
+#      - name: Stylelint
+#        if: success()
+#        uses: borales/actions-yarn@v2.3.0
+#        with:
+#          cmd: lint:stylelint
+
+      - name: Build Website
+        if: success()
+        uses: borales/actions-yarn@v2.3.0
+        with:
+          cmd: build
+
+      - name: Deploying Website
+        if: success()
+        uses: JamesIves/github-pages-deploy-action@3.7.1
+        env:
+          ACCESS_TOKEN: ${{ secrets.GH_TOKEN }}
+          BRANCH: gh-pages
+          FOLDER: public

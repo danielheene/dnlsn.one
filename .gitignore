@@ -1,0 +1,14 @@
+.cache/
+.idea/
+.nyc_output/
+build/
+coverage/
+dist/
+logs/
+node_modules/
+public/
+typings/
+
+.DS_Store
+*.log
+*.log*
