@@ -1,0 +1,23 @@
+{
+  "title": "DNLSN",
+  "url": "dnlsn.net",
+  "description": "",
+  "colors": {
+    "primary": "#fff",
+    "secondary": "#000"
+  },
+  "socialLinks": [
+    {
+      "name": "Instagram",
+      "url": "https://instagram.com/dnlsn"
+    },
+    {
+      "name": "Soundcloud",
+      "url": "https://soundcloud.com/dj-dnlsn"
+    },
+    {
+      "name": "YouTube",
+      "url": "https://www.youtube.com/c/DNLSN"
+    }
+  ]
+}
