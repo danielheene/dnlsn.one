@@ -17,6 +17,7 @@ import {
 } from './Shell.types';
 import { commands } from './Shell.config';
 import { printShellBanner } from './Shell.banner';
+import Separator from 'inquirer/lib/objects/separator';
 
 const initialState: ShellState = {
   view: {
@@ -55,7 +56,7 @@ export const Shell = new (class {
   #shellCommandQuestionBundles: Record<
     string,
     ShellCommandGeneral['questions']
-  >;
+  > = {};
 
   /**
    * handles next callbacks on prompt subscription
@@ -166,11 +167,13 @@ export const Shell = new (class {
   ): ShellCommandListChoice | void => {
     const bundleIdentifier = `${view}:bundled`;
     const bundleChoice = {
-      name: 'Run all tasks?',
+      name: `Run all ${view} tasks?`,
       value: bundleIdentifier,
     };
 
     if (
+      this.#shellCommandQuestionBundles &&
+      typeof this.#shellCommandQuestionBundles === 'object' &&
       Object.prototype.hasOwnProperty.call(
         this.#shellCommandQuestionBundles,
         bundleIdentifier
@@ -216,76 +219,80 @@ export const Shell = new (class {
     }
   };
 
+  #generateBackLinkCommand = (
+    view: ShellCommandIdentifier
+  ): ShellCommandListChoice | void => {
+    const viewCommand =
+      view !== 'root'
+        ? this.#shellCommands.find((cmd) => cmd.id === view)
+        : this.#shellCommandRoot;
+
+    if (!viewCommand) {
+      throw new Error('command not found!');
+    }
+
+    const re = new RegExp(/(?=.+)(:*[A-Za-z0-9]+)$/gm);
+    const isRootView = view === 'root';
+    const isBundledView = view.endsWith(':bundled');
+    const isQuestionView = Object.prototype.hasOwnProperty.call(
+      viewCommand,
+      'questions'
+    );
+    const noParentView = !Object.prototype.hasOwnProperty.call(
+      viewCommand,
+      'parent'
+    );
+
+    if (isRootView || isBundledView || isQuestionView || noParentView) return;
+
+    const parentId = view.replace(re, '');
+    const parentView =
+      this.#shellCommands.find((cmd) => cmd.id === parentId) ||
+      this.#shellCommandRoot;
+
+    return {
+      name: parentView.backLabel || `Back to: ${parentView.label}`,
+      value: parentView.id,
+    };
+  };
+
   #generateViewItems = (view: ShellCommandIdentifier) => {
     const bundledCommand = this.#generateBundledCommand(view);
+    const backLinkChoice = this.#generateBackLinkCommand(view);
+    const listViewHeader = bundledCommand
+      ? [bundledCommand, new Separator()]
+      : [];
+    const listViewFooter = backLinkChoice
+      ? [new Separator(), backLinkChoice]
+      : [];
 
-    console.log('generateViewItems', view);
-    // const viewItem = this.#shellCommands.find((cmd) => cmd.id === view);
-    // console.log('viewItem', viewItem);
-    //
-    // const isRootView = view === 'root';
-    // const isBundledView = view.endsWith(':bundled');
-    // const isOverview =
-    //   !(viewItem && 'questions' in viewItem) || viewItem.questions.length < 1;
-    //
-    // const viewHasChildren = this.#shellCommands.find(
-    //   (cmd) => cmd.parent === view
-    // );
+    const viewChoices = this.#shellCommands
+      .filter((cmd) => cmd.parent === view)
+      .map((cmd) => ({
+        name: cmd.label,
+        value: cmd.id,
+      }));
 
-    //
-    // const parentView = isRootView
-    //   ? null
-    //   : this.#shellCommands.find(
-    //       () =>
-    //         view
-    //           .split(':')
-    //           .splice(-1, 1)
-    //           .filter((item) => item !== ':')
-    //           .join(':') === viewItem.parent
-    //     ) || this.#shellCommandRoot;
-    //
-    // const parentViewChoice = {
-    //   name: parentView.backLabel,
-    //   value: parentView.id,
-    // };
-    //
-    // const viewChoices = this.#shellCommands
-    //   .filter((cmd) => cmd.parent === view)
-    //   .map((cmd) => ({
-    //     name: cmd.label,
-    //     value: cmd.id,
-    //   }));
-    //
-    // console.log('bundledChildActions', bundledChildActions);
-    // console.log('viewChoices', viewChoices);
-    // console.log('parentView', parentView);
-    //
-    // const mergedChoices = [
-    //   bundledChildChoice,
-    //   new inquirer.Separator(),
-    //   ...viewChoices,
-    //   new inquirer.Separator(),
-    //   parentViewChoice,
-    // ];
-    //
-    // const viewQuestions: ShellCommandQuestion = {
-    //   type: 'list',
-    //   name: 'view',
-    //   message: 'What shall I do?',
-    //   choices: mergedChoices,
-    //   loop: false,
-    //   askAnswered: true,
-    // };
-    //
-    // console.log('mergedChoices:', mergedChoices);
-    //
-    // this.#prompts$.next(viewQuestions);
+    const viewQuestions: ShellCommandQuestion = {
+      type: 'list',
+      name: 'view',
+      message: 'What shall I do?',
+      choices: [...listViewHeader, ...viewChoices, ...listViewFooter],
+      loop: false,
+      askAnswered: true,
+    };
+
+    this.#prompts$.next(viewQuestions);
   };
 
   /**
    * determine root command output from subcommands and other data
    */
   #generateShellCommandRoot = () => {
+    if (this.#shellCommandRoot) {
+      this.#prompts$.next(this.#shellCommandRoot.question);
+    }
+
     const rootDependents = this.#shellCommands.filter(
       (cmd) => cmd.parent === 'root'
     );
@@ -300,7 +307,6 @@ export const Shell = new (class {
       question: {
         type: 'list',
         name: 'view',
-        message: 'What shall I do?',
         choices: rootChoices,
         loop: false,
         askAnswered: true,
